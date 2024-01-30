@@ -7,21 +7,32 @@ const PORT = process.env.PORT || 13000;
 
 app.use(express.json());
 
-mongoose.connect('mongodb://localhost:27017/blockchain_db');
+mongoose.connect('mongodb://localhost:27017/blockchain_db'
+);
 
 const alertSchema = new mongoose.Schema({
   address: { type: String, required: true },
-  thresholdAmount: { type: Number, required: true }
+  thresholdAmount: { type: Number, required: true },
+  notificationMethods: { type: [String], default: [] }, // Array to store notification methods
 });
 
 const Alert = mongoose.model('Alert', alertSchema);
 
+// In-memory cache for API responses
+const cache = {};
 
 app.get('/address/:address', async (req, res) => {
   const { address } = req.params;
 
   try {
     const etherscanAPIKey = 'R73UPDEYY8WSN3SND5WFE2SUPPD66SWQKE';
+
+    // Check if data is in cache
+    if (cache[address]) {
+      console.log(`Fetching data for ${address} from cache`);
+      return res.json(cache[address]);
+    }
+
     const ethBalanceUrl = `https://api.etherscan.io/api?module=account&action=balance&address=${address}&tag=latest&apikey=${etherscanAPIKey}`;
     const ethBalanceResponse = await axios.get(ethBalanceUrl);
     const ethBalance = ethBalanceResponse.data.result;
@@ -37,6 +48,9 @@ app.get('/address/:address', async (req, res) => {
     const alerts = await Alert.find({ address });
 
     const responseData = { address, ethBalance, erc20TokenBalances, transactions, alerts };
+
+    cache[address] = responseData;
+
     res.json(responseData);
   } catch (error) {
     console.error(`Error fetching address details for ${address}:`, error.message);
@@ -63,7 +77,6 @@ app.post('/alerts', async (req, res) => {
       res.json({ success: true, message: 'Alert set up successfully' });
     }
   } catch (error) {
-  //  console.error(`Error setting up alert for ${address}:`, error.message);
     res.status(500).json({ error: `Error setting up alert for ${address}:` });
   }
 });
