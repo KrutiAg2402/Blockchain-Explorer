@@ -45,9 +45,25 @@ app.get('/address/:address', async (req, res) => {
     const transactionResponse = await axios.get(transactionApiUrl);
     const transactions = transactionResponse.data.result;
 
+    // Fetch logs
+    const logsUrl = `https://api.etherscan.io/api?module=logs&action=getLogs&fromBlock=0&toBlock=latest&address=${address}&apikey=${etherscanAPIKey}`;
+    const logsResponse = await axios.get(logsUrl);
+    const logs = logsResponse.data.result;
+
+    const log = logsResponse.data.result.slice(0, 10);
+    // Fetch internal transactions
+    const internalTransactions = {};
+    
+      const transactionHash = logs[0].transactionHash;
+
+      // Fetch internal transactions using the extracted transaction hash
+      const internalTxUrl = `https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${transactionHash}&apikey=${etherscanAPIKey}`;
+      const internalTxResponse = await axios.get(internalTxUrl);
+      internalTransactions[transactionHash]  = internalTxResponse.data.result;
+    
     const alerts = await Alert.find({ address });
 
-    const responseData = { address, ethBalance, erc20TokenBalances, transactions, alerts };
+    const responseData = { address, ethBalance, erc20TokenBalances, transactions, logs, internalTransactions, alerts };
 
     cache[address] = responseData;
 
